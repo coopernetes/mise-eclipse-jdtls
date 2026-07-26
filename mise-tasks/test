@@ -47,6 +47,81 @@ else
     echo "✓ eclipse-jdtls@${NO_MILESTONE_VERSION} correctly rejected"
 fi
 
+# --- Snapshot listing --------------------------------------------------------
+# The rolling channel is published as the literal "latest-snapshot" so that the
+# requested version, the Available entry, and what PreInstall returns are all
+# the same string — mise looks rolling versions up by the requested string.
+
+SNAPSHOT_VERSION="latest-snapshot"
+
+if MISE_PRERELEASES=1 mise ls-remote eclipse-jdtls | grep -qx -- "$SNAPSHOT_VERSION"; then
+    echo "✓ $SNAPSHOT_VERSION listed by ls-remote"
+else
+    echo "✗ $SNAPSHOT_VERSION missing from ls-remote"
+    fail=1
+fi
+
+# --- Snapshot install --------------------------------------------------------
+
+mise install "eclipse-jdtls@${SNAPSHOT_VERSION}"
+snapshot_path=$(mise where "eclipse-jdtls@${SNAPSHOT_VERSION}")
+echo "snapshot installed to: $snapshot_path"
+
+check "[ -x '$snapshot_path/bin/jdtls' ]"    "snapshot: bin/jdtls exists and is executable"
+check "[ -d '$snapshot_path/plugins' ]"      "snapshot: plugins/ exists"
+check "compgen -G '$snapshot_path/plugins/org.eclipse.equinox.launcher_*.jar' > /dev/null" \
+      "snapshot: equinox launcher jar present"
+
+# --- Rolling snapshot staleness ----------------------------------------------
+# Snapshots reuse one version string across rebuilds, so mise detects new builds
+# by comparing the checksum stored at install time against the one Available
+# reports now. Rather than downloading a superseded archive, this rewrites the
+# stored checksum to simulate having installed an older build.
+
+if [ -n "$snapshot_path" ]; then
+    checksum_file="$snapshot_path/.mise.checksum"
+
+    if [ -f "$checksum_file" ]; then
+        echo "✓ snapshot: checksum recorded at $checksum_file"
+        original_checksum=$(cat "$checksum_file")
+
+        # `mise outdated` only considers tools present in a config file, so the
+        # snapshot needs one before it will report on it at all.
+        rolling_dir=$(mktemp -d)
+        trap 'rm -rf "$rolling_dir"' EXIT
+        printf '[tools]\neclipse-jdtls = "%s"\n' "$SNAPSHOT_VERSION" > "$rolling_dir/mise.toml"
+        export MISE_TRUSTED_CONFIG_PATHS="$rolling_dir"
+
+        outdated_before=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        if echo "$outdated_before" | grep -q -- "$SNAPSHOT_VERSION"; then
+            echo "✗ snapshot reported outdated immediately after install"
+            echo "$outdated_before"
+            fail=1
+        else
+            echo "✓ snapshot not outdated immediately after install"
+        fi
+
+        # Any differing value exercises the comparison; it is plain string
+        # equality, so a synthetic hash avoids depending on an older build
+        # still being published.
+        printf '%s' "$(printf '0%.0s' {1..64})" > "$checksum_file"
+
+        outdated_after=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        if echo "$outdated_after" | grep -q -- "$SNAPSHOT_VERSION"; then
+            echo "✓ snapshot reported outdated when stored checksum differs"
+        else
+            echo "✗ stale snapshot not detected"
+            echo "$outdated_after"
+            fail=1
+        fi
+
+        printf '%s' "$original_checksum" > "$checksum_file"
+    else
+        echo "✗ snapshot: no .mise.checksum written (rolling tracking is inert)"
+        fail=1
+    fi
+fi
+
 # --- Execution smoke test ----------------------------------------------------
 # bin/jdtls is a Python launcher that starts a JVM, so this only runs when both
 # are available. Every jdtls argument other than -h starts the language server

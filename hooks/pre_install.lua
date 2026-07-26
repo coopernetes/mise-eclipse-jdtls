@@ -1,36 +1,42 @@
-local function get_milestone_filename(version)
+--- Resolves the archive currently published in a milestone or snapshot
+--- directory. Both publish a latest.txt naming the timestamped archive, plus a
+--- matching .sha256 holding the bare hash.
+--- @param base_url string Directory URL, without a trailing slash
+--- @return table|nil info {url, checksum, version}, or nil on failure
+--- @return string|nil reason Why the lookup failed, set whenever info is nil
+local function get_filename(base_url)
     local http = require("http")
     local log = require("log")
+    local strings = require("strings")
 
-    local base_url = "https://download.eclipse.org/jdtls/milestones/" .. version
     local url = base_url .. "/latest.txt"
     log.debug("GET " .. url)
     local resp = http.get({
         url = url,
     })
     if resp.status_code == 404 then
-        log.debug("got 404, body: " .. resp.body)
-        return nil
+        return nil, "no build is published at " .. base_url
+    elseif resp.status_code ~= 200 then
+        log.debug("GET " .. url .. " body: " .. resp.body)
+        return nil, url .. " returned HTTP " .. resp.status_code
     end
 
     -- trims trailing newline
-    local strings = require("strings")
     local filename = strings.trim_space(resp.body)
 
-    log.debug("GET " .. base_url .. "/" .. filename .. ".sha256")
+    local checksum_url = base_url .. "/" .. filename .. ".sha256"
+    log.debug("GET " .. checksum_url)
     local checksum_resp = http.get({
-        url = base_url .. "/" .. filename .. ".sha256",
+        url = checksum_url,
     })
-    local checksum = ""
     if checksum_resp.status_code ~= 200 then
-        log.warn("GET " .. filename .. ".sha256 failed, got " .. checksum_resp.status_code)
-        log.debug("body: " .. checksum_resp.body)
-    else
-        checksum = strings.trim_space(checksum_resp.body)
+        log.debug("GET " .. checksum_url .. " body: " .. checksum_resp.body)
+        return nil, checksum_url .. " returned HTTP " .. checksum_resp.status_code
     end
+
     return {
-        filename = filename,
-        checksum = checksum,
+        url = base_url .. "/" .. filename,
+        checksum = strings.trim_space(checksum_resp.body),
     }
 end
 
@@ -40,15 +46,31 @@ end
 --- @return table Version and download information
 function PLUGIN:PreInstall(ctx)
     local version = ctx.version
-    local milestone_download_base = "https://download.eclipse.org/jdtls/milestones/"
-    local maybe_milestone = get_milestone_filename(version)
-    if maybe_milestone ~= nil then
+
+    if version == "latest-snapshot" or version:match("%-snapshot$") then
+        local snapshot_file, reason = get_filename("https://download.eclipse.org/jdtls/snapshots")
+        if snapshot_file == nil then
+            error("Cannot install " .. version .. ": " .. reason)
+        end
+        -- Echo the requested version back unchanged. mise stores the checksum
+        -- under the resolved version but looks it up by the *requested* one, so
+        -- resolving "latest-snapshot" to a concrete build would break update
+        -- detection. See CONTRIBUTING.md.
         return {
             version = version,
-            url = milestone_download_base .. version .. "/" .. maybe_milestone.filename,
-            sha256 = maybe_milestone.checksum,
+            url = snapshot_file.url,
+            sha256 = snapshot_file.checksum,
         }
-    else
-        error("Cannot install " .. version .. ", no milestone binary exists. Try another version.")
     end
+
+    local base_url = "https://download.eclipse.org/jdtls/milestones/" .. version
+    local milestone_file, reason = get_filename(base_url)
+    if milestone_file == nil then
+        error("Cannot install " .. version .. ": " .. reason)
+    end
+    return {
+        version = version,
+        url = milestone_file.url,
+        sha256 = milestone_file.checksum,
+    }
 end

@@ -5,10 +5,11 @@ for distributions where no native package exists or the packaged version is
 outdated.
 
 > [!NOTE]
-> Upstream publishes prebuilt binaries only as *milestone* builds on
-> <https://download.eclipse.org/jdtls/milestones/>. There is no GitHub release
-> artifact. This plugin installs those milestone builds; it does not compile
-> from source.
+> Upstream publishes no GitHub release artifact. The only prebuilt binaries are
+> the *milestone* builds on <https://download.eclipse.org/jdtls/milestones/> and
+> the rolling *snapshot* builds on
+> <https://download.eclipse.org/jdtls/snapshots/>. This plugin installs both; it
+> does not compile from source.
 
 ## Requirements
 
@@ -48,8 +49,8 @@ mise use eclipse-jdtls@1.60.0
 jdtls
 ```
 
-Versions are plain semver (`1.60.0`), matching the upstream milestone
-directories.
+Milestone versions are plain semver (`1.60.0`), matching the upstream milestone
+directories. The rolling snapshot channel is `latest-snapshot` — see below.
 
 ## Available versions
 
@@ -67,16 +68,39 @@ comparison of Git tags against published milestones, and for how to regenerate
 it. Requesting a version with no milestone build fails with an explicit error
 rather than a confusing download failure.
 
+## Snapshot builds
+
+Upstream also publishes rolling snapshot builds from
+<https://download.eclipse.org/jdtls/snapshots/>. These are CI builds of the
+next, unreleased version, rebuilt several times a week, and so run ahead of the
+newest milestone.
+
+```shell
+mise install eclipse-jdtls@latest-snapshot
+```
+
+Only the current snapshot is installable. Historical snapshot builds are not
+supported: upstream keeps dozens of timestamped archives of the same version,
+and pinning one has no lasting value.
+
+`latest-snapshot` is a rolling channel rather than a fixed version: the same
+version string tracks whatever upstream has most recently published. mise
+records the checksum of the build it installed, so `mise upgrade` reinstalls the
+snapshot once a newer archive appears. Milestone versions are immutable and
+never change once installed.
+
+`eclipse-jdtls@latest` always resolves to the newest **milestone** — snapshots
+are never selected implicitly, so you have to ask for one by name.
+
+Snapshots are untested builds of unreleased code. Prefer a milestone build
+unless you specifically need an unreleased fix.
+
 ## How it works
 
-The plugin reads the `latest.txt` file that upstream publishes in each
-milestone directory to resolve the timestamped archive name, then hands mise
-the archive URL along with the accompanying `.sha256` checksum. mise does the
-download, verification, and extraction.
-
-The milestone archive extracts to a flat layout (`bin/`, `plugins/`,
-`config_*/`, `features/`) which is already the structure jdtls expects, so
-there is no post-install step.
+Milestone and snapshot archives both carry a build timestamp in their filename
+that cannot be derived from the version. Upstream publishes a `latest.txt`
+alongside them naming the current archive, so the plugin resolves the download
+URL from that and verifies it against the accompanying `.sha256`.
 
 ## Contributing
 

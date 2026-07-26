@@ -89,18 +89,67 @@ Hook responsibilities:
 
 | Hook | Does |
 | --- | --- |
-| `hooks/available.lua` | Lists 1.x tags from the GitHub tags API, minus known versions with no milestone build |
+| `hooks/available.lua` | Lists 1.x tags from the GitHub tags API, minus known versions with no milestone build, plus the current snapshot |
 | `hooks/pre_install.lua` | Resolves the archive name via `latest.txt`, fetches the checksum, returns both to mise |
 | `hooks/env_keys.lua` | Adds `bin/` to `PATH` |
 
-There is no `post_install.lua`. Milestone archives extract to a flat layout
-that already matches what jdtls expects, so nothing needs rearranging. Hooks are
-optional — mise simply does not call one that is absent.
+There is no `post_install.lua`. Both milestone and snapshot archives extract to
+a flat layout that already matches what jdtls expects, so nothing needs
+rearranging. Hooks are optional — mise simply does not call one that is absent.
 
 `PreInstall` does **not** download anything. It returns a descriptor
 (`{version, url, sha256}`) and mise performs the download, checksum
 verification, and extraction. The only HTTP requests the plugin makes itself are
 for `latest.txt` and the checksum.
+
+## The two checksums
+
+Confusingly, the plugin supplies a checksum in two places for two unrelated
+purposes:
+
+| Field | Purpose | Applies to |
+| --- | --- | --- |
+| `PreInstall` → `sha256` | Integrity: mise verifies the downloaded archive against it | every version |
+| `Available` → `checksum` | Identity: detects that a rolling version now points at different bytes | `rolling` entries only |
+
+Milestone versions are immutable, so the version string alone identifies the
+build and no `Available` checksum is needed. Snapshots reuse the same version
+string across rebuilds, so mise needs a second token to tell builds apart.
+
+**These two values must match.** mise stores `PreInstall`'s `sha256` at install
+time and later compares it against `Available`'s `checksum` to decide whether a
+rolling version is stale (`src/backend/vfox.rs`, `src/backend/mod.rs` —
+`is_rolling_version_outdated`). The comparison is plain string equality, so if
+the two hooks report different values the snapshot is considered outdated on
+every check and reinstalls endlessly. Both therefore fetch the same
+`.sha256` file.
+
+Returning no `sha256` from `PreInstall` has the same effect: nothing is stored,
+and an absent stored checksum is treated as outdated.
+
+## Why the snapshot version is "latest-snapshot"
+
+`Available` publishes the rolling channel as the literal string
+`latest-snapshot`, not as the resolved build it currently points at
+(`1.61.0-snapshot`). That is deliberate and load-bearing:
+
+- mise looks a rolling version up by the **requested** string
+  (`outdated_info.rs` passes `tool_version.request.version()`), so the
+  `Available` entry has to use that same string or the lookup misses and the
+  version is silently never considered outdated.
+- The stored checksum is written under the **resolved** version, so `PreInstall`
+  must echo `ctx.version` back unchanged. Resolving `latest-snapshot` to a
+  concrete build makes the write key and the read key disagree.
+
+In short: requested version, `Available` entry, and `PreInstall`'s returned
+version must all be the same literal. This is the same shape other rolling
+channels use, e.g. zig's `master`.
+
+A side effect worth knowing: `latest-snapshot` is not valid semver, so mise
+does not classify it as a prerelease. It is therefore always listed by
+`ls-remote` regardless of the `prereleases` setting, and it can never win
+`@latest` resolution — which is what keeps `@latest` meaning "newest
+milestone".
 
 ## Versions with no milestone build
 
