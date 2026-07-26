@@ -14,7 +14,6 @@ function PLUGIN:Available(ctx)
     local semver = require("semver")
     local log = require("log")
 
-
     local repo_url = "https://api.github.com/repos/eclipse-jdtls/eclipse.jdt.ls/tags?per_page=100&page="
     local page = 1
     local moretags = true
@@ -36,7 +35,7 @@ function PLUGIN:Available(ctx)
 
         local tags = json.decode(resp.body)
         local count = 0
-        for _,tag in ipairs(tags) do
+        for _, tag in ipairs(tags) do
             table.insert(alltags, tag)
             count = count + 1
         end
@@ -56,12 +55,11 @@ function PLUGIN:Available(ctx)
         version = version:gsub("^v", "")
 
         if string.find(version, "^1%.") ~= nil and not NO_MILESTONE[version] then
-
             count = count + 1
 
             table.insert(tag_table, {
                 version = version,
-                note = nil
+                note = nil,
             })
         end
     end

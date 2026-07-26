@@ -6,7 +6,7 @@ local function get_milestone_filename(version)
     local url = base_url .. "/latest.txt"
     log.debug("GET " .. url)
     local resp = http.get({
-        url = url
+        url = url,
     })
     if resp.status_code == 404 then
         log.debug("got 404, body: " .. resp.body)
@@ -19,7 +19,7 @@ local function get_milestone_filename(version)
 
     log.debug("GET " .. base_url .. "/" .. filename .. ".sha256")
     local checksum_resp = http.get({
-        url = base_url .. "/" .. filename .. ".sha256"
+        url = base_url .. "/" .. filename .. ".sha256",
     })
     local checksum = ""
     if checksum_resp.status_code ~= 200 then
@@ -30,7 +30,7 @@ local function get_milestone_filename(version)
     end
     return {
         filename = filename,
-        checksum = checksum
+        checksum = checksum,
     }
 end
 
@@ -52,41 +52,3 @@ function PLUGIN:PreInstall(ctx)
         error("Cannot install " .. version .. ", no milestone binary exists. Try another version.")
     end
 end
-
--- Helper function for platform detection (uncomment and modify as needed)
---[[
-local function get_platform()
-    -- RUNTIME object is provided by mise/vfox
-    -- RUNTIME.osType: "Windows", "Linux", "Darwin"
-    -- RUNTIME.archType: "amd64", "386", "arm64", etc.
-
-    local os_name = RUNTIME.osType:lower()
-    local arch = RUNTIME.archType
-
-    -- Map to your tool's platform naming convention
-    -- Adjust these mappings based on how your tool names its releases
-    local platform_map = {
-        ["darwin"] = {
-            ["amd64"] = "darwin-amd64",
-            ["arm64"] = "darwin-arm64",
-        },
-        ["linux"] = {
-            ["amd64"] = "linux-amd64",
-            ["arm64"] = "linux-arm64",
-            ["386"] = "linux-386",
-        },
-        ["windows"] = {
-            ["amd64"] = "windows-amd64",
-            ["386"] = "windows-386",
-        }
-    }
-
-    local os_map = platform_map[os_name]
-    if os_map then
-        return os_map[arch] or "linux-amd64"  -- fallback
-    end
-
-    -- Default fallback
-    return "linux-amd64"
-end
---]]
