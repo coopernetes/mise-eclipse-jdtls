@@ -7,7 +7,7 @@ PLUGIN = { -- luacheck: ignore
     version = "0.1.0",
     description = "A mise tool plugin for eclipse-jdtls",
     author = "coopernetes",
-    updateUrl = "https://github.com/coopernetes/mise-eclipse-jdtls-plugin",
+    updateUrl = "https://github.com/coopernetes/mise-eclipse-jdtls",
 
     -- Optional: Minimum mise runtime version required
     minRuntimeVersion = "0.2.0",

@@ -33,7 +33,7 @@ eclipse-jdtls = "1.60.0"
 ## Usage
 
 ```shell
-mise plugin install https://github.com/coopernetes/mise-eclipse-jdtls-plugin
+mise plugin install https://github.com/coopernetes/mise-eclipse-jdtls
 
 # List installable versions
 mise ls-remote eclipse-jdtls
