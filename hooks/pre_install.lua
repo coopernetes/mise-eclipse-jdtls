@@ -1,42 +1,56 @@
+local http = require("http")
+local log = require("log")
+
+local function get_milestone_filename(version)
+    local base_url = "https://download.eclipse.org/jdtls/milestones/" .. version
+    local url = base_url .. "/latest.txt"
+    log.debug("GET " .. url)
+    local resp = http.get({
+        url = url
+    })
+    if resp.status_code == 404 then
+        log.debug("got 404, body: " .. resp.body)
+        return nil
+    end
+
+    -- trims trailing newline
+    local strings = require("strings")
+    local filename = strings.trim_space(resp.body)
+
+    log.debug("GET " .. base_url .. "/" .. filename .. ".sha256")
+    local checksum_resp = http.get({
+        url = base_url .. "/" .. filename .. ".sha256"
+    })
+    local checksum = ""
+    if checksum_resp.status_code ~= 200 then
+        log.warn("GET " .. filename .. ".sha256 failed, got " .. checksum_resp.status_code)
+        log.debug("body: " .. checksum_resp.body)
+    else
+        checksum = strings.trim_space(checksum_resp.body)
+    end
+    return {
+        filename = filename,
+        checksum = checksum
+    }
+end
+
 --- Returns download information for a specific version
 --- Documentation: https://mise.jdx.dev/tool-plugin-development.html#preinstall-hook
 --- @param ctx {version: string, runtimeVersion: string} Context
 --- @return table Version and download information
 function PLUGIN:PreInstall(ctx)
     local version = ctx.version
-    -- ctx.runtimeVersion contains the full version string if needed
-
-    -- Example 1: Simple binary download
-    -- local url = "https://github.com/<GITHUB_USER>/<GITHUB_REPO>/releases/download/v" .. version .. "/<TOOL>-linux-amd64"
-
-    -- Example 2: Platform-specific binary
-    -- local platform = get_platform() -- Uncomment the helper function below
-    -- local url = "https://github.com/<GITHUB_USER>/<GITHUB_REPO>/releases/download/v" .. version .. "/<TOOL>-" .. platform
-
-    -- Example 3: Archive (tar.gz, zip) - mise will extract automatically
-    -- local url = "https://github.com/<GITHUB_USER>/<GITHUB_REPO>/releases/download/v" .. version .. "/<TOOL>-" .. version .. "-linux-amd64.tar.gz"
-
-    -- Example 4: Raw file from repository
-    -- local url = "https://raw.githubusercontent.com/<GITHUB_USER>/<GITHUB_REPO>/" .. version .. "/bin/<TOOL>"
-
-    -- Replace with your actual download URL pattern
-    local url = "https://example.com/<TOOL>/releases/download/" .. version .. "/<TOOL>"
-
-    -- Optional: Fetch checksum for verification
-    -- local sha256 = fetch_checksum(version) -- Implement if checksums are available
-
-    return {
-        version = version,
-        url = url,
-        -- sha256 = sha256, -- Optional but recommended for security
-        note = "Downloading <TOOL> " .. version,
-        -- addition = { -- Optional: download additional components
-        --     {
-        --         name = "component",
-        --         url = "https://example.com/component.tar.gz"
-        --     }
-        -- }
-    }
+    local milestone_download_base = "https://download.eclipse.org/jdtls/milestones/"
+    local maybe_milestone = get_milestone_filename(version)
+    if maybe_milestone ~= nil then
+        return {
+            version = version,
+            url = milestone_download_base .. version .. "/" .. maybe_milestone.filename,
+            sha256 = maybe_milestone.checksum,
+        }
+    else
+        error("Cannot install " .. version .. ", no milestone binary exists. Try another version.")
+    end
 end
 
 -- Helper function for platform detection (uncomment and modify as needed)

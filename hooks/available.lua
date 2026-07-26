@@ -1,3 +1,9 @@
+-- Git tags with no corresponding milestone build.
+-- See docs/milestone-coverage.md (verified 2026-07-26).
+local NO_MILESTONE = {
+    ["1.59.0"] = true,
+}
+
 --- Returns a list of available versions for the tool
 --- Documentation: https://mise.jdx.dev/tool-plugin-development.html#available-hook
 --- @param ctx {args: string[]} Context (args = user arguments)
@@ -42,35 +48,30 @@ function PLUGIN:Available(ctx)
         page = page + 1
     until not moretags
 
-    local valid_tags = {}
-
     -- Process tags/releases
     local tag_table = {}
     local count = 0
-    for i, tag_info in ipairs(alltags) do
+    for _, tag_info in ipairs(alltags) do
         local version = tag_info.name
-        -- there's a few tags that are not formal releases so check that its v delimited
-        if string.find(version, "v%d") ~= nil then
+        version = version:gsub("^v", "")
 
-            version = version:gsub("^v", "")
+        if string.find(version, "^1%.") ~= nil and not NO_MILESTONE[version] then
+
             count = count + 1
 
-            if i == 1 then
-                table.insert(tag_table, {
-                    version = version,
-                    note = "latest"
-                })
-            else
-                table.insert(tag_table, {
-                    version = version,
-                    note = nil
-                })
-            end
+            table.insert(tag_table, {
+                version = version,
+                note = nil
+            })
         end
     end
 
     log.debug("total tags: " .. count)
 
-    sorted_tags = semver.sort_by(tag_table, "version")
+    local sorted_tags = semver.sort_by(tag_table, "version")
+    if #sorted_tags == 0 then
+        error("no installable jdtls versions found")
+    end
+    sorted_tags[#sorted_tags].note = "latest"
     return sorted_tags
 end

@@ -2,17 +2,68 @@
 #MISE description="Run plugin tests - install and execute tool"
 set -euo pipefail
 
+VERSION="1.60.0"
+NO_MILESTONE_VERSION="1.59.0"
+
 mise plugin link --force eclipse-jdtls .
-mise cache clear
-mise install eclipse-jdtls@1.60.0
 
-# Capture and display the output while also verifying it
-output=$(mise exec "eclipse-jdtls@1.60.0" -- "jdtls" --version)
-echo "eclipse-jdtls output: $output"
+# Note: deliberately not running `mise cache clear` here. It forces a re-download
+# of a ~180MB archive on every run. Set MISE_ALWAYS_KEEP_DOWNLOAD=1 while
+# developing so repeat runs are offline.
 
-if echo "$output" | grep -q 'eclipse-jdtls@1.60.0'; then
-    echo "✓ Tests passed"
+mise install "eclipse-jdtls@${VERSION}"
+
+install_path=$(mise where "eclipse-jdtls@${VERSION}")
+echo "installed to: $install_path"
+
+# --- Layout assertions -------------------------------------------------------
+# These are deterministic and need neither python3 nor a JRE, so they are the
+# load-bearing part of this test: they verify the plugin placed files correctly.
+
+fail=0
+check() {
+    if eval "$1"; then
+        echo "✓ $2"
+    else
+        echo "✗ $2"
+        fail=1
+    fi
+}
+
+check "[ -x '$install_path/bin/jdtls' ]"        "bin/jdtls exists and is executable"
+check "[ -d '$install_path/plugins' ]"          "plugins/ exists"
+check "[ -d '$install_path/config_linux' ]"     "config_linux/ exists"
+check "compgen -G '$install_path/plugins/org.eclipse.equinox.launcher_*.jar' > /dev/null" \
+      "equinox launcher jar present"
+
+# --- Negative test -----------------------------------------------------------
+# 1.59.0 is tagged upstream but has no milestone build. PreInstall must reject
+# it with a clear error rather than failing on a checksum mismatch.
+
+if mise install "eclipse-jdtls@${NO_MILESTONE_VERSION}" > /dev/null 2>&1; then
+    echo "✗ expected eclipse-jdtls@${NO_MILESTONE_VERSION} to fail (no milestone build)"
+    fail=1
 else
-    echo "✗ Test failed: expected version eclipse-jdtls@1.60.0"
+    echo "✓ eclipse-jdtls@${NO_MILESTONE_VERSION} correctly rejected"
+fi
+
+# --- Execution smoke test ----------------------------------------------------
+# bin/jdtls is a Python launcher that starts a JVM, so this only runs when both
+# are available. Every jdtls argument other than -h starts the language server
+# and blocks on stdin, so -h is the only usable smoke test.
+
+if ! command -v python3 > /dev/null 2>&1; then
+    echo "- skipping execution test: python3 not found"
+elif ! command -v java > /dev/null 2>&1; then
+    echo "- skipping execution test: java not found"
+else
+    output=$(mise exec "eclipse-jdtls@${VERSION}" -- jdtls -h)
+    echo "$output"
+    check "echo \"\$output\" | grep -qi 'usage: jdtls'" "jdtls -h prints usage"
+fi
+
+if [ "$fail" -ne 0 ]; then
+    echo "✗ Tests failed"
     exit 1
 fi
+echo "✓ Tests passed"
