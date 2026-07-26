@@ -1,7 +1,7 @@
-local http = require("http")
-local log = require("log")
-
 local function get_milestone_filename(version)
+    local http = require("http")
+    local log = require("log")
+
     local base_url = "https://download.eclipse.org/jdtls/milestones/" .. version
     local url = base_url .. "/latest.txt"
     log.debug("GET " .. url)
