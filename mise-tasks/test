@@ -92,7 +92,7 @@ if [ -n "$snapshot_path" ]; then
         printf '[tools]\neclipse-jdtls = "%s"\n' "$SNAPSHOT_VERSION" > "$rolling_dir/mise.toml"
         export MISE_TRUSTED_CONFIG_PATHS="$rolling_dir"
 
-        outdated_before=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        outdated_before=$(MISE_PRERELEASES=1 mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
         if echo "$outdated_before" | grep -q -- "$SNAPSHOT_VERSION"; then
             echo "✗ snapshot reported outdated immediately after install"
             echo "$outdated_before"
@@ -106,7 +106,7 @@ if [ -n "$snapshot_path" ]; then
         # still being published.
         printf '%s' "$(printf '0%.0s' {1..64})" > "$checksum_file"
 
-        outdated_after=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        outdated_after=$(MISE_PRERELEASES=1 mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
         if echo "$outdated_after" | grep -q -- "$SNAPSHOT_VERSION"; then
             echo "✓ snapshot reported outdated when stored checksum differs"
         else
