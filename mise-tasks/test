@@ -92,7 +92,7 @@ if [ -n "$snapshot_path" ]; then
         printf '[tools]\neclipse-jdtls = "%s"\n' "$SNAPSHOT_VERSION" > "$rolling_dir/mise.toml"
         export MISE_TRUSTED_CONFIG_PATHS="$rolling_dir"
 
-        outdated_before=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        outdated_before=$(MISE_PRERELEASES=1 mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
         if echo "$outdated_before" | grep -q -- "$SNAPSHOT_VERSION"; then
             echo "✗ snapshot reported outdated immediately after install"
             echo "$outdated_before"
@@ -106,7 +106,7 @@ if [ -n "$snapshot_path" ]; then
         # still being published.
         printf '%s' "$(printf '0%.0s' {1..64})" > "$checksum_file"
 
-        outdated_after=$(mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
+        outdated_after=$(MISE_PRERELEASES=1 mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 || true)
         if echo "$outdated_after" | grep -q -- "$SNAPSHOT_VERSION"; then
             echo "✓ snapshot reported outdated when stored checksum differs"
         else
@@ -115,9 +115,21 @@ if [ -n "$snapshot_path" ]; then
             # trace below names which branch of is_rolling_version_outdated ran.
             echo "! stale snapshot not detected (not failing the suite; see below)"
             echo "$outdated_after"
+
+            # get_version_info() looks the version up in the *cached* remote
+            # list and maps any error to None, so a failed Available call and a
+            # missing entry are indistinguishable from outside. Print both.
+            echo "--- ls-remote tail (is latest-snapshot still listed?) ---"
+            mise ls-remote eclipse-jdtls 2>&1 | tail -3
+
+            echo "--- stored checksum ---"
+            cat "$checksum_file"
+            echo
+
             echo "--- rolling trace ---"
             MISE_LOG_LEVEL=trace mise -C "$rolling_dir" outdated eclipse-jdtls 2>&1 |
-                grep -i 'rolling\|checksum' || echo "(no rolling trace emitted)"
+                grep -iE 'rolling|checksum changed|no stored|cache' | head -20 ||
+                echo "(no rolling trace emitted)"
         fi
 
         printf '%s' "$original_checksum" > "$checksum_file"

@@ -85,12 +85,26 @@ and pinning one has no lasting value.
 
 `latest-snapshot` is a rolling channel rather than a fixed version: the same
 version string tracks whatever upstream has most recently published. mise
-records the checksum of the build it installed, so `mise upgrade` reinstalls the
-snapshot once a newer archive appears. Milestone versions are immutable and
-never change once installed.
+records the checksum of the build it installed, so it can tell when a newer
+archive appears. Milestone versions are immutable and never change once
+installed.
 
-`eclipse-jdtls@latest` always resolves to the newest **milestone** — snapshots
-are never selected implicitly, so you have to ask for one by name.
+> [!IMPORTANT]
+> mise treats `latest-snapshot` as a prerelease, and prereleases are excluded
+> from version lookups by default. Installing works regardless, but
+> `mise outdated` and `mise upgrade` will **not** notice new snapshot builds
+> unless prereleases are enabled:
+>
+> ```shell
+> mise settings set prereleases true
+> ```
+>
+> Without it the snapshot stays pinned to the build you first installed. The
+> same setting is what makes `latest-snapshot` appear in `mise ls-remote`.
+
+`eclipse-jdtls@latest` always resolves to the newest **milestone**, with
+prereleases enabled or not — snapshots are never selected implicitly, so you
+have to ask for one by name.
 
 Snapshots are untested builds of unreleased code. Prefer a milestone build
 unless you specifically need an unreleased fix.
