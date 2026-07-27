@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#MISE description="Run the test suite in an isolated container"
+set -euo pipefail
+
+# The suite installs tools and writes to the mise data directory, so running it
+# directly against a workstation pollutes that setup. It also reads mise
+# settings, which means local configuration can mask failures that CI would
+# catch. This runs it against a clean, default-configured mise every time.
+
+IMAGE="mise-eclipse-jdtls-test"
+
+engine=""
+for candidate in podman docker; do
+    if command -v "$candidate" > /dev/null 2>&1; then
+        engine="$candidate"
+        break
+    fi
+done
+
+if [ -z "$engine" ]; then
+    echo "error: neither podman nor docker found on PATH" >&2
+    exit 1
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+echo "using $engine"
+
+"$engine" build -t "$IMAGE" "$repo_root/test"
+
+# The repo is mounted read-only: the plugin is linked from here, but nothing in
+# the suite should write to the working tree. Everything mise creates lives
+# inside the container and is discarded with it.
+exec "$engine" run --rm \
+    -v "$repo_root:/src:ro" \
+    "$IMAGE" "$@"

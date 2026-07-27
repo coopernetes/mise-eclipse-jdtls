@@ -145,11 +145,33 @@ In short: requested version, `Available` entry, and `PreInstall`'s returned
 version must all be the same literal. This is the same shape other rolling
 channels use, e.g. zig's `master`.
 
-A side effect worth knowing: `latest-snapshot` is not valid semver, so mise
-does not classify it as a prerelease. It is therefore always listed by
-`ls-remote` regardless of the `prereleases` setting, and it can never win
-`@latest` resolution — which is what keeps `@latest` meaning "newest
-milestone".
+mise does classify `latest-snapshot` as a prerelease, so it is excluded from
+version lookups unless `prereleases` is enabled. Two consequences:
+
+- `mise ls-remote` omits it by default.
+- `get_version_info` resolves against that same filtered list, so with
+  prereleases off the rolling lookup finds nothing, returns early, and the
+  snapshot is silently never reported outdated.
+
+It still cannot win `@latest` resolution either way, which is what keeps
+`@latest` meaning "newest milestone".
+
+## Test in a container
+
+```shell
+mise run test-container
+```
+
+This builds `test/Dockerfile` and runs the suite against a clean mise with
+default settings, using podman or docker, whichever is present. The repo is
+mounted read-only and everything mise creates is discarded with the container.
+
+Prefer this over running `mise run test` directly. The suite installs tools and
+writes to the mise data directory, and more importantly it *reads mise
+settings* — so local configuration can hide real failures. That is not
+hypothetical: the rolling snapshot check passed for days on a workstation with
+`prereleases = true` while failing on CI, and the setting was the bug. The
+container deliberately leaves that setting at its default.
 
 ## Versions with no milestone build
 
