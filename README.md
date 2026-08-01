@@ -4,51 +4,6 @@
 for distributions where no native package exists or the packaged version is
 outdated.
 
-> [!NOTE]
-> Upstream publishes no GitHub release artifact. The only prebuilt binaries are
-> the *milestone* builds on <https://download.eclipse.org/jdtls/milestones/> and
-> the rolling *snapshot* builds on
-> <https://download.eclipse.org/jdtls/snapshots/>. This plugin installs both; it
-> does not compile from source.
-
-## Requirements
-
-**mise 2026.2.1 or newer.** The plugin uses the Lua `log` module, which older
-releases do not provide — they fail with `module 'log' not found`. Run
-`mise self-update` if you hit that.
-
-jdtls ships `bin/jdtls` as a Python launcher that starts a JVM, so you need
-both at runtime:
-
-- **python3** — runs the launcher script
-- **A JRE** — runs the language server itself. Recent jdtls releases require
-  Java 21 or newer; check the upstream release notes for the exact floor of the
-  version you install.
-
-On mise 2026.7.3 or newer these are declared to mise, so a missing one is
-reported before anything is downloaded, along with the package that provides
-it:
-
-```
-mise WARN  missing system dependencies for tools about to install:
-mise WARN    eclipse-jdtls: python3 — `python3` not found on PATH
-mise WARN  install with: sudo apt-get install -y python3 default-jre-headless
-```
-
-Whether that prompts, installs automatically, warns, or stays quiet is
-controlled by mise's `system_deps` setting (`prompt`, `auto`, `warn`,
-`ignore`).
-
-mise can also provide both itself. Because the launcher resolves `python3` from
-`PATH` at exec time, a mise-managed python satisfies it:
-
-```toml
-[tools]
-java = "temurin-21"
-python = "3.12"
-eclipse-jdtls = "1.60.0"
-```
-
 ## Usage
 
 ```shell
@@ -57,9 +12,6 @@ mise plugin install https://github.com/coopernetes/mise-eclipse-jdtls
 # List installable versions
 mise ls-remote eclipse-jdtls
 
-# Install a specific version
-mise install eclipse-jdtls@1.60.0
-
 # Install and add to the current project's mise.toml
 mise use eclipse-jdtls@1.60.0
 
@@ -67,76 +19,60 @@ mise use eclipse-jdtls@1.60.0
 jdtls
 ```
 
-Milestone versions are plain semver (`1.60.0`), matching the upstream milestone
-directories. The rolling snapshot channel is `latest-snapshot` — see below.
+Recommended project setup, which also provides the runtime dependencies below:
 
-## Available versions
+```toml
+[tools]
+java = "temurin-21"
+python = "3.12"
+eclipse-jdtls = "1.60.0"
+```
 
-`mise ls-remote eclipse-jdtls` lists jdtls `1.x` releases that have a milestone
-build. Two deliberate exclusions:
+## Requirements
 
-- **Pre-1.0 releases** (2017–2021) are filtered out. They are old enough to be
-  of no practical use.
-- **`1.59.0`** is tagged upstream but has no milestone build, so it cannot be
-  installed. Use `1.60.0` instead.
+- **mise 2026.2.1 or newer** — older releases fail with `module 'log' not
+  found`. Run `mise self-update`.
+- **python3** — `bin/jdtls` is a Python launcher.
+- **A JRE** — recent jdtls releases need Java 21 or newer.
 
-`1.59.0` is currently the only gap in the 1.x range. See
-[docs/milestone-coverage.md](./docs/milestone-coverage.md) for the full
-comparison of Git tags against published milestones, and for how to regenerate
-it. Requesting a version with no milestone build fails with an explicit error
-rather than a confusing download failure.
+python3 and the JRE are declared to mise, so on 2026.7.3 or newer a missing one
+is reported before anything downloads, with the package that provides it.
+
+## Versions
+
+| Selector | Installs |
+| --- | --- |
+| `1.60.0` | that milestone build |
+| `latest` | the newest milestone |
+| `latest-snapshot` | the current rolling snapshot |
+
+Milestone versions are plain semver and immutable. `mise ls-remote` lists the
+`1.x` releases that have a milestone build; pre-1.0 releases are excluded, as is
+`1.59.0`, which upstream tagged but never published a build for. Asking for a
+version with no build fails with an explicit error. See
+[docs/milestone-coverage.md](./docs/milestone-coverage.md) for the full list.
 
 ## Snapshot builds
 
-Upstream also publishes rolling snapshot builds from
-<https://download.eclipse.org/jdtls/snapshots/>. These are CI builds of the
-next, unreleased version, rebuilt several times a week, and so run ahead of the
-newest milestone.
-
-```shell
-mise install eclipse-jdtls@latest-snapshot
-```
-
-Only the current snapshot is installable. Historical snapshot builds are not
-supported: upstream keeps dozens of timestamped archives of the same version,
-and pinning one has no lasting value.
-
-`latest-snapshot` is a rolling channel rather than a fixed version: the same
-version string tracks whatever upstream has most recently published. mise
-records the checksum of the build it installed, so it can tell when a newer
-archive appears. Milestone versions are immutable and never change once
-installed.
+`latest-snapshot` is a rolling channel: CI builds of the next, unreleased
+version, rebuilt several times a week. They are untested builds of unreleased
+code — prefer a milestone unless you need an unreleased fix. Only the current
+snapshot is installable, and `latest` never selects one implicitly.
 
 > [!IMPORTANT]
-> mise treats `latest-snapshot` as a prerelease, and prereleases are excluded
-> from version lookups by default. Installing works regardless, but
-> `mise outdated` and `mise upgrade` will **not** notice new snapshot builds
-> unless prereleases are enabled:
+> mise treats `latest-snapshot` as a prerelease, and excludes prereleases from
+> version lookups by default. Installing works either way, but `mise outdated`
+> and `mise upgrade` will not notice new snapshot builds — and `ls-remote` will
+> not list the channel — unless you enable them:
 >
 > ```shell
 > mise settings set prereleases true
 > ```
->
-> Without it the snapshot stays pinned to the build you first installed. The
-> same setting is what makes `latest-snapshot` appear in `mise ls-remote`.
-
-`eclipse-jdtls@latest` always resolves to the newest **milestone**, with
-prereleases enabled or not — snapshots are never selected implicitly, so you
-have to ask for one by name.
-
-Snapshots are untested builds of unreleased code. Prefer a milestone build
-unless you specifically need an unreleased fix.
-
-## How it works
-
-Milestone and snapshot archives both carry a build timestamp in their filename
-that cannot be derived from the version. Upstream publishes a `latest.txt`
-alongside them naming the current archive, so the plugin resolves the download
-URL from that and verifies it against the accompanying `.sha256`.
 
 ## Contributing
 
-See [CONTRIBUTING](./CONTRIBUTING.md).
+See [CONTRIBUTING](./CONTRIBUTING.md), which covers how the plugin resolves
+builds and why.
 
 ## License
 
