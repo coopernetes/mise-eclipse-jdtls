@@ -25,8 +25,22 @@ both at runtime:
   Java 21 or newer; check the upstream release notes for the exact floor of the
   version you install.
 
-mise can provide both. Because the launcher resolves `python3` from `PATH` at
-exec time, a mise-managed python satisfies it:
+On mise 2026.7.3 or newer these are declared to mise, so a missing one is
+reported before anything is downloaded, along with the package that provides
+it:
+
+```
+mise WARN  missing system dependencies for tools about to install:
+mise WARN    eclipse-jdtls: python3 — `python3` not found on PATH
+mise WARN  install with: sudo apt-get install -y python3 default-jre-headless
+```
+
+Whether that prompts, installs automatically, warns, or stays quiet is
+controlled by mise's `system_deps` setting (`prompt`, `auto`, `warn`,
+`ignore`).
+
+mise can also provide both itself. Because the launcher resolves `python3` from
+`PATH` at exec time, a mise-managed python satisfies it:
 
 ```toml
 [tools]

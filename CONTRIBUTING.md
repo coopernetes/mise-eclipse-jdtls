@@ -206,6 +206,35 @@ Lua, not mise additions:
 - **Missing table keys return `nil`**, which is what makes `if SET[key] then`
   the idiomatic membership test — there is no `in` operator.
 
+## System dependencies
+
+`metadata.lua` declares python3 and java via `PLUGIN.systemDependencies`, which
+mise checks before installing. Verified against a container with neither
+present:
+
+```
+mise WARN  missing system dependencies for tools about to install:
+mise WARN    eclipse-jdtls: python3 — `python3` not found on PATH
+mise WARN    eclipse-jdtls: java — `java` not found on PATH
+mise WARN  install with: sudo apt-get install -y python3 default-jre-headless
+```
+
+`mise doctor` reports the same as warnings. Both only consider tools present in
+a config file, so a linked plugin alone is not enough to see this — the tool has
+to be in a `mise.toml`.
+
+Notes:
+
+- Requires mise 2026.7.3. Older releases parse the metadata keys they know and
+  ignore the rest, so this degrades rather than raising the floor.
+- User-facing behaviour is governed by mise's `system_deps` setting
+  (`prompt`, `auto`, `warn`, `ignore`) — the plugin only declares.
+- Entries here are required. `SystemDependency` also supports `optional` with a
+  reason string, which surfaces one informational line and never prompts;
+  `vfox:jdx/vfox-php` uses that for library checks.
+- mise cannot offer to satisfy these with mise-managed tools, only with system
+  package managers, so `packages` maps to apt/dnf/pacman/apk/brew names.
+
 ## Minimum mise version
 
 The plugin's floor is the newest mise release among everything it uses. There
