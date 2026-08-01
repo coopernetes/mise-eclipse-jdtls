@@ -206,6 +206,37 @@ Lua, not mise additions:
 - **Missing table keys return `nil`**, which is what makes `if SET[key] then`
   the idiomatic membership test — there is no `in` operator.
 
+## Minimum mise version
+
+The plugin's floor is the newest mise release among everything it uses. There
+is no way to enforce it: `minRuntimeVersion` in `metadata.lua` is a vfox field
+that mise's source never reads, so it is inert. The floor is documented in the
+README and each `require` goes through `require_mise_module`, which reports the
+requirement instead of a bare `module 'log' not found`.
+
+| Used | First mise release |
+| --- | --- |
+| `http`, `json`, `strings` | v2025.7.7 |
+| `rolling` / `checksum` on `AvailableVersion` | v2026.1.5 |
+| **`log`** | **v2026.2.1** ← current floor |
+| `semver` (not used) | v2026.1.5 |
+| `http.try_get` (not used) | v2026.3.11 |
+
+`http.try_get` is deliberately avoided. It returns `nil, err` instead of
+raising, but every failure in this plugin is fatal anyway, so it would raise the
+floor by five weeks for no behavioural difference.
+
+**Before adopting a new module or field, check when it landed:**
+
+```sh
+# in a clone of jdx/mise
+sha=$(git log --diff-filter=A --format=%H -1 -- crates/vfox/src/lua_mod/<name>.rs)
+git tag --contains "$sha" --sort=v:refname | grep -E '^v20' | head -1
+```
+
+If it is newer than the current floor, either raise the floor deliberately and
+update the README, or do without.
+
 ## The mise API surface
 
 mise does not extend the Lua language. Everything it provides is:

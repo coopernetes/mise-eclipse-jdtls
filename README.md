@@ -13,6 +13,10 @@ outdated.
 
 ## Requirements
 
+**mise 2026.2.1 or newer.** The plugin uses the Lua `log` module, which older
+releases do not provide — they fail with `module 'log' not found`. Run
+`mise self-update` if you hit that.
+
 jdtls ships `bin/jdtls` as a Python launcher that starts a JVM, so you need
 both at runtime:
 

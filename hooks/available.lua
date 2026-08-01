@@ -4,14 +4,30 @@ local NO_MILESTONE = {
     ["1.59.0"] = true,
 }
 
+--- Requires a mise-provided Lua module, reporting the version requirement
+--- rather than a bare "module not found" when running on an older mise.
+--- @param name string
+--- @return table
+local function require_mise_module(name)
+    local ok, mod = pcall(require, name)
+    if not ok then
+        error(
+            "this plugin requires mise 2026.2.1 or newer (Lua module '"
+                .. name
+                .. "' is unavailable). Run `mise self-update`."
+        )
+    end
+    return mod
+end
+
 --- Returns a list of available versions for the tool
 --- Documentation: https://mise.jdx.dev/tool-plugin-development.html#available-hook
 --- @param ctx {args: string[]} Context (args = user arguments)
 --- @return table[] List of available versions
 function PLUGIN:Available(ctx)
-    local http = require("http")
-    local json = require("json")
-    local log = require("log")
+    local http = require_mise_module("http")
+    local json = require_mise_module("json")
+    local log = require_mise_module("log")
 
     local repo_url = "https://api.github.com/repos/eclipse-jdtls/eclipse.jdt.ls/tags?per_page=100&page="
     local page = 1
@@ -70,13 +86,14 @@ function PLUGIN:Available(ctx)
     end
 
     local base_url = "https://download.eclipse.org/jdtls/snapshots"
-    local latest_resp, err = http.try_get({
+    -- http.get rather than http.try_get: every failure here is fatal anyway, and
+    -- http.get raises on transport errors. try_get would raise this plugin's
+    -- minimum mise version from 2026.2.1 to 2026.3.11 for no behavioural gain.
+    local latest_resp = http.get({
         url = base_url .. "/latest.txt",
     })
-    if err ~= nil then
-        error("could not fetch snapshot info: " .. err)
-    elseif latest_resp.status_code == 200 then
-        local strings = require("strings")
+    if latest_resp.status_code == 200 then
+        local strings = require_mise_module("strings")
         local latest_filename = strings.trim_space(latest_resp.body)
 
         log.debug("latest filename: " .. latest_filename)

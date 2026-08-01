@@ -1,13 +1,29 @@
+--- Requires a mise-provided Lua module, reporting the version requirement
+--- rather than a bare "module not found" when running on an older mise.
+--- @param name string
+--- @return table
+local function require_mise_module(name)
+    local ok, mod = pcall(require, name)
+    if not ok then
+        error(
+            "this plugin requires mise 2026.2.1 or newer (Lua module '"
+                .. name
+                .. "' is unavailable). Run `mise self-update`."
+        )
+    end
+    return mod
+end
+
 --- Resolves the archive currently published in a milestone or snapshot
 --- directory. Both publish a latest.txt naming the timestamped archive, plus a
 --- matching .sha256 holding the bare hash.
 --- @param base_url string Directory URL, without a trailing slash
---- @return table|nil info {url, checksum, version}, or nil on failure
+--- @return table|nil info {url, checksum}, or nil on failure
 --- @return string|nil reason Why the lookup failed, set whenever info is nil
 local function get_filename(base_url)
-    local http = require("http")
-    local log = require("log")
-    local strings = require("strings")
+    local http = require_mise_module("http")
+    local log = require_mise_module("log")
+    local strings = require_mise_module("strings")
 
     local url = base_url .. "/latest.txt"
     log.debug("GET " .. url)
