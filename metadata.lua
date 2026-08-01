@@ -4,8 +4,8 @@
 
 PLUGIN = { -- luacheck: ignore
     name = "eclipse-jdtls",
-    version = "0.1.0",
-    description = "A mise tool plugin for eclipse-jdtls",
+    version = "0.1.1",
+    description = "Eclipse JDT Language Server (jdtls) prebuilt milestone and snapshot builds",
     author = "coopernetes",
     updateUrl = "https://github.com/coopernetes/mise-eclipse-jdtls",
 
